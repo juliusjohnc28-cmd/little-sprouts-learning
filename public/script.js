@@ -52,8 +52,12 @@ async function speak(phrase){
   speechAbort=new AbortController();
   try{
     const response=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:phrase}),signal:speechAbort.signal});
-    if(!response.ok)throw Error('voice service unavailable');
+    if(!response.ok){
+      const detail=await response.json().catch(()=>({}));
+      throw Error(detail.error||'Voice service unavailable');
+    }
     const blob=await response.blob();
+    if($('voiceStatus'))$('voiceStatus').textContent='🎙️ Miss Lily · ElevenLabs';
     if(sequence!==speechSequence||!sound)return;
     const url=URL.createObjectURL(blob);
     const audio=new Audio(url);speechAudio=audio;
@@ -61,6 +65,7 @@ async function speak(phrase){
     await audio.play();
   }catch(e){
     if(sequence!==speechSequence||!sound)return;
+    if($('voiceStatus')){$('voiceStatus').textContent='🔈 Browser voice (ElevenLabs error: '+(e?.message||'Unavailable')+')';$('voiceStatus').title='The game is using browser speech. Check /api/voice-status for missing secrets.';}
     browserSpeak(phrase,sequence);
   }
 }
@@ -78,7 +83,7 @@ else if(game==='numbers'){answer=round%10+1;title='Counting Meadow 🌼';subtitl
 else if(game==='shapes'){let item=shapes[round%shapes.length];answer=item[0];title='Shape Safari 🦄';subtitle='Look at the shape and pick its name!';visual=`<div class="shape-display">${item[1]}</div>`;question='What shape is this?';choices=[item[0],...shapes.filter(x=>x[0]!==item[0]).sort(()=>Math.random()-.5).slice(0,2).map(x=>x[0])].sort(()=>Math.random()-.5)}
 else if(game==='colors'){let item=colors[round%colors.length];answer=item[0];title='Rainbow Colors 🌈';subtitle='Meet a beautiful new color!';visual=`<div class="color-display" style="background:${item[1]}"><span>🎈</span></div>`;question='Which color do you see?';choices=[item[0],...colors.filter(x=>x[0]!==item[0]).sort(()=>Math.random()-.5).slice(0,2).map(x=>x[0])].sort(()=>Math.random()-.5)}
 else{let isLetter=round%2===0;let n=Math.floor(round/2);if(isLetter){let index=(n*7+2)%26;answer=ABC[index];visual=`<div class="character">${words[index][1]}</div><div class="word-display">${words[index][0]}</div>`;question='What letter does this start with?';choices=letterOptions(answer)}else{answer=(n*3+2)%10+1;visual=`<div class="count-objects">${Array.from({length:answer},()=>'<span>⭐</span>').join('')}</div>`;question='How many stars are there?';choices=pickOptions(answer,10)}title='Star Challenge 🏆';subtitle='Show us what you know!'}
-$('main').innerHTML=`<div class="play-screen"><button class="back-btn" id="backHome">← Back to games</button><div class="play-panel"><span class="eyebrow">ROUND ${round+1}</span><div class="mascot" aria-hidden="true">${game==='shapes'?'🦄':game==='colors'?'🦋':game==='numbers'?'🐸':game==='alphabet'?'🦊':'🐻'}</div><h1>${title}</h1><p>${subtitle}</p>${visual}<h2>${question}</h2><div class="choice-grid" id="choices">${choices.map(x=>`<button class="choice" data-answer="${x}" aria-label="Answer ${x}">${x}</button>`).join('')}</div><div class="feedback" id="feedback" role="status" aria-live="polite"></div><div class="play-actions"><button class="secondary-btn" id="hearBtn">🔊 Hear it again</button><button class="primary-btn" id="nextBtn">Next →</button></div></div></div>`;
+$('main').innerHTML=`<div class="play-screen"><button class="back-btn" id="backHome">← Back to games</button><div class="play-panel"><div id="voiceStatus" role="status" aria-live="polite" style="font-size:13px;color:#775d8f;margin-bottom:8px">🎙️ Checking teacher voice…</div><span class="eyebrow">ROUND ${round+1}</span><div class="mascot" aria-hidden="true">${game==='shapes'?'🦄':game==='colors'?'🦋':game==='numbers'?'🐸':game==='alphabet'?'🦊':'🐻'}</div><h1>${title}</h1><p>${subtitle}</p>${visual}<h2>${question}</h2><div class="choice-grid" id="choices">${choices.map(x=>`<button class="choice" data-answer="${x}" aria-label="Answer ${x}">${x}</button>`).join('')}</div><div class="feedback" id="feedback" role="status" aria-live="polite"></div><div class="play-actions"><button class="secondary-btn" id="hearBtn">🔊 Hear it again</button><button class="primary-btn" id="nextBtn">Next →</button></div></div></div>`;
 $('backHome').onclick=home;$('hearBtn').onclick=()=>speak(game==='alphabet'?`${answer}. ${words[round%26][0]}`:question);$('nextBtn').onclick=()=>{round++;showRound()};document.querySelectorAll('.choice').forEach(b=>b.onclick=()=>{if(locked)return;const guess=b.dataset.answer;if(String(guess)===String(answer)){locked=true;b.classList.add('correct');document.querySelectorAll('.choice').forEach(x=>x.disabled=true);$('feedback').textContent='🌟 Hooray! You got it! +1 star';let p=player();p.stars++;if(game==='alphabet'&&!p.letters.includes(answer))p.letters.push(answer);if(game==='numbers'&&!p.numbers.includes(answer))p.numbers.push(answer);if(game==='quiz')p.wins++;if(game==='shapes'){p.shapes??=[];if(!p.shapes.includes(answer))p.shapes.push(answer)}if(game==='colors'){p.colors??=[];if(!p.colors.includes(answer))p.colors.push(answer)}save();celebrate();ding();speak('Amazing! You got it!');toast('⭐ Superstar!')}else{b.classList.add('wrong');$('feedback').textContent='Keep trying! You can do it! 💛';speak('Try again!')}});
 speak(game==='alphabet'?`This is ${answer}. ${answer} is for ${words[round%26][0]}. Find ${answer}!`:game==='shapes'?'Look at this shape. What shape is it?':game==='colors'?'Look at this balloon. What color is it?':question);window.scrollTo({top:0,behavior:'smooth'})}
 $('soundBtn').onclick=()=>{sound=!sound;$('soundBtn').textContent=sound?'🔊':'🔇';$('soundBtn').setAttribute('aria-label',sound?'Mute sound':'Enable sound');if(!sound)stopSpeech();toast(sound?'Sound on!':'Sound off')};
