@@ -7,7 +7,39 @@ const $=id=>document.getElementById(id);let sound=true;let currentGame='',round=
 const storageKey='little-sprouts-v1';const fresh=()=>({profiles:[{id:'explorer',name:'Explorer',avatar:'🐻',letters:[],numbers:[],wins:0,stars:0,shapes:[],colors:[]}],active:'explorer'});
 let data;try{data=JSON.parse(localStorage.getItem(storageKey))||fresh();if(!Array.isArray(data.profiles)||!data.profiles.length) data=fresh()}catch{data=fresh()}
 const player=()=>data.profiles.find(p=>p.id===data.active)||data.profiles[0];const save=()=>{try{localStorage.setItem(storageKey,JSON.stringify(data))}catch{}refresh()};
-function speak(phrase){if(!sound||!('speechSynthesis'in window))return;try{speechSynthesis.cancel();let utterance=new SpeechSynthesisUtterance(phrase);utterance.rate=.78;utterance.pitch=1.23;utterance.lang='en-US';speechSynthesis.speak(utterance)}catch{}}
+// Browser-native speech: prefer a warm, clear, feminine-sounding English teacher voice.
+// Available voices differ by browser/device; never assume a specific voice is installed.
+let teacherVoice=null;
+function selectTeacherVoice(){
+  if(!('speechSynthesis'in window))return;
+  const voices=speechSynthesis.getVoices();
+  const english=voices.filter(v=>/^en([_-]|$)/i.test(v.lang));
+  const preferred=[/microsoft (jenny|aria|zira)/i,/google us english/i,/samantha/i,/ava/i,/victoria/i,/karen/i,/serena/i,/moira/i,/female/i];
+  const score=v=>{
+    const name=v.name||'';
+    let rank=preferred.findIndex(rx=>rx.test(name));
+    return (rank<0?0:100-rank*8)+(/en[-_]US/i.test(v.lang)?15:0)+(v.localService?2:0);
+  };
+  teacherVoice=[...english].sort((a,b)=>score(b)-score(a))[0]||null;
+}
+if('speechSynthesis'in window){
+  selectTeacherVoice();
+  speechSynthesis.addEventListener?.('voiceschanged',selectTeacherVoice);
+}
+function speak(phrase){
+  if(!sound||!('speechSynthesis'in window))return;
+  try{
+    speechSynthesis.cancel();
+    selectTeacherVoice();
+    const utterance=new SpeechSynthesisUtterance(phrase);
+    if(teacherVoice)utterance.voice=teacherVoice;
+    utterance.lang=teacherVoice?.lang||'en-US';
+    utterance.rate=0.86; // Gentle preschool-teacher pace
+    utterance.pitch=1.17; // Bright and friendly, not squeaky
+    utterance.volume=1;
+    speechSynthesis.speak(utterance);
+  }catch{}
+}
 function ding(){if(!sound)return;try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;const ctx=new A();[523,659,784].forEach((freq,i)=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(.0001,ctx.currentTime+i*.11);gain.gain.exponentialRampToValueAtTime(.14,ctx.currentTime+i*.11+.025);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+i*.11+.19);osc.connect(gain).connect(ctx.destination);osc.start(ctx.currentTime+i*.11);osc.stop(ctx.currentTime+i*.11+.2)});setTimeout(()=>ctx.close(),800)}catch{}}
 let toastTimer;function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2300)}
 function refresh(){let p=player();$('profileName').textContent=p.name;$('starsLabel').textContent=`⭐ ${p.stars} stars`;if($('letterCount')){$('letterCount').innerHTML=`${p.letters.length}<span>/26</span>`;$('numberCount').innerHTML=`${p.numbers.length}<span>/10</span>`;$('quizCount').textContent=p.wins;$('letterBar').style.width=p.letters.length/26*100+'%';$('numberBar').style.width=p.numbers.length*10+'%';$('quizBar').style.width=Math.min(100,p.wins*10)+'%'}}
