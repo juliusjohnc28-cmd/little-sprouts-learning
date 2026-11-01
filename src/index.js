@@ -42,8 +42,10 @@ export default {
   }catch{return json({error:'Voice service temporarily unavailable'},502)}
   if(!upstream.ok){
    const status=upstream.status;
+   let apiError='';
+   try{const body=await upstream.json();apiError=String(body?.detail?.status||body?.detail?.message||body?.error||'').slice(0,160)}catch{}
    const reason=status===401?'ElevenLabs API key rejected':status===403?'ElevenLabs key lacks voice access':status===404?'Voice ID not found':status===429?'ElevenLabs quota or rate limit exceeded':status===422?'Voice or model settings invalid':'ElevenLabs request failed';
-   return json({error:reason,upstreamStatus:status},502);
+   return json({error:reason,upstreamStatus:status,providerDetail:apiError},502);
   }
   const audio=await upstream.arrayBuffer();
   if(audio.byteLength>3000000)return json({error:'Voice output too large'},502);
