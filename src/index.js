@@ -10,6 +10,10 @@ function json(data,status=200){return new Response(JSON.stringify(data),{status,
 export default {
  async fetch(request,env,ctx){
   const url=new URL(request.url);
+  if(url.pathname==='/api/voice-status'){
+   if(request.method!=='GET')return json({error:'Method not allowed'},405);
+   return json({provider:'ElevenLabs',configured:Boolean(env.ELEVENLABS_API_KEY&&env.ELEVENLABS_VOICE_ID),missing:[...(!env.ELEVENLABS_API_KEY?['ELEVENLABS_API_KEY']:[]),...(!env.ELEVENLABS_VOICE_ID?['ELEVENLABS_VOICE_ID']:[])]});
+  }
   if(url.pathname!=='/api/tts')return env.ASSETS.fetch(request);
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
   const origin=request.headers.get('Origin');
@@ -36,7 +40,11 @@ export default {
     signal:AbortSignal.timeout(15000)
    });
   }catch{return json({error:'Voice service temporarily unavailable'},502)}
-  if(!upstream.ok)return json({error:'Voice service unavailable'},502);
+  if(!upstream.ok){
+   const status=upstream.status;
+   const reason=status===401?'ElevenLabs API key rejected':status===403?'ElevenLabs key lacks voice access':status===404?'Voice ID not found':status===429?'ElevenLabs quota or rate limit exceeded':status===422?'Voice or model settings invalid':'ElevenLabs request failed';
+   return json({error:reason,upstreamStatus:status},502);
+  }
   const audio=await upstream.arrayBuffer();
   if(audio.byteLength>3000000)return json({error:'Voice output too large'},502);
   const result=new Response(audio,{headers:{'Content-Type':'audio/mpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
