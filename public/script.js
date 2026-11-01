@@ -54,7 +54,7 @@ async function speak(phrase){
     const response=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:phrase}),signal:speechAbort.signal});
     if(!response.ok){
       const detail=await response.json().catch(()=>({}));
-      throw Error(detail.error||'Voice service unavailable');
+      throw Error([detail.error,detail.upstreamStatus&&'HTTP '+detail.upstreamStatus,detail.providerDetail].filter(Boolean).join(' · ')||'Voice service unavailable');
     }
     const blob=await response.blob();
     if($('voiceStatus'))$('voiceStatus').textContent='🎙️ Miss Lily · ElevenLabs';
