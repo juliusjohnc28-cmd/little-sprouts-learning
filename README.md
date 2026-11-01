@@ -19,3 +19,6 @@ Use Deploy after saving. Do not put the key in GitHub, source code, frontend JS,
 The server only accepts fixed lesson sentences, caches generated MP3s at Cloudflare edge for a day, and falls back to built-in browser speech if the API fails. Cache is per Cloudflare data center, so ElevenLabs may be called again in other regions or on cache expiration. Voice settings are tuned for a playful teacher but final sound depends on selected ElevenLabs voice.
 
 Note: If using Cloudflare Pages instead of Workers, convert the Worker handler to a Pages Function or migrate deployment to Workers; this repository targets Cloudflare Workers.
+
+## Deployment verification
+After each GitHub push, inspect Cloudflare Workers → Deployments for a successful deployment. Open the website and try **Hear it again** in Alphabet Garden. The ElevenLabs key and voice ID must be configured as Worker secrets; otherwise browser speech is used automatically.
